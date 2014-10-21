@@ -264,7 +264,9 @@ public class ForecastFragment extends Fragment {
             }
             String[] weatherData = null;
             try {
-                weatherData = getWeatherDataFromJson(forecastJsonStr, numDays);
+                if (forecastJsonStr != null) {
+                    weatherData = getWeatherDataFromJson(forecastJsonStr, numDays);
+                }
             } catch (JSONException e) {
                 Log.e(LOG_TAG, "JSON parse error: ", e);
             }

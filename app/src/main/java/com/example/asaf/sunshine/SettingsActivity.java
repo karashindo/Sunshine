@@ -21,6 +21,7 @@ public class SettingsActivity extends PreferenceActivity
         // For all preferences, attach an OnPreferenceChangeListener so the UI summary can be
         // updated when the preference changes.
         bindPreferenceSummaryToValue(findPreference(getString(R.string.pref_location_key)));
+        bindPreferenceSummaryToValue(findPreference(getString(R.string.pref_temp_units_key)));
     }
 
     /**
@@ -51,6 +52,10 @@ public class SettingsActivity extends PreferenceActivity
             int prefIndex = listPreference.findIndexOfValue(stringValue);
             if (prefIndex >= 0) {
                 preference.setSummary(listPreference.getEntries()[prefIndex]);
+            } else {
+                if (listPreference.getKey() == getString(R.string.pref_temp_units_key)) {
+                    preference.setSummary(getString(R.string.pref_temp_units_default));
+                }
             }
         } else {
             // For other preferences, set the summary to the value's simple string representation.
