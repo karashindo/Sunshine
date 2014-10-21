@@ -181,11 +181,24 @@ public class ForecastFragment extends Fragment {
                 double high = temperatureObject.getDouble(OWM_MAX);
                 double low = temperatureObject.getDouble(OWM_MIN);
 
+                // Convert temperatures to imperial if needed
+                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getActivity());
+                String temperatureUnitPref = sharedPref.getString(getString(R.string.pref_temp_units_key),
+                        getString(R.string.pref_temp_units_default));
+                if (temperatureUnitPref.equals(getString(R.string.pref_temp_units_key_imperial))) {
+                    high = celsiusToImperial(high);
+                    low = celsiusToImperial(low);
+                }
+
                 highAndLow = formatHighLows(high, low);
                 resultStrs[i] = day + " - " + description + " - " + highAndLow;
             }
 
             return resultStrs;
+        }
+
+        private double celsiusToImperial(double celsius) {
+            return ((9.0 / 5.0) * celsius) + 32;
         }
 
         @Override

@@ -1,10 +1,14 @@
 package com.example.asaf.sunshine;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 
 public class MyActivity extends ActionBarActivity {
@@ -38,8 +42,29 @@ public class MyActivity extends ActionBarActivity {
             Intent intent = new Intent(this, SettingsActivity.class);
             startActivity(intent);
             return true;
+        } else if (id == R.id.action_show_location) {
+            // Read location from SharePreferences
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+            String locationPref = sharedPref.getString(getString(R.string.pref_location_key),
+                    getString(R.string.pref_location_default));
+            showMap(locationPref);
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showMap(String location) {
+        final String MAP_GEO_BASE_URI = "geo:0,0?";
+        Uri geoLocationUri = Uri.parse(MAP_GEO_BASE_URI).buildUpon()
+            .appendQueryParameter("q", "us zip code " + location).build();
+
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(geoLocationUri);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, getString(R.string.error_map_intent), Toast.LENGTH_SHORT).show();
+        }
     }
 
 }
