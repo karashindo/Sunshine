@@ -18,7 +18,9 @@
     <string name="pref_temp_units_label">Temperature Units</string>
     <string name="pref_temp_dialog_title">Temperature Units</string>
     <string name="pref_temp_units_default">Metric</string>
-    <string name="pref_temp_units_metric">Metric</string>
-    <string name="pref_temp_units_imperial">Imperial</string>
+    <string name="pref_temp_units_value_metric">Metric</string>
+    <string name="pref_temp_units_value_imperial">Imperial</string>
+    <string name="pref_temp_units_key_metric">metric</string>
+    <string name="pref_temp_units_key_imperial">imperial</string>
 
 </resources>
