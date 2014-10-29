@@ -9,7 +9,7 @@ import android.provider.BaseColumns;
  */
 public class WeatherContract {
     // Base content URI
-    public static final String CONTENT_AUTHORITY = "com.example.asaf.sunshine.app";
+    public static final String CONTENT_AUTHORITY = "com.example.asaf.sunshine";
     public static final Uri BASE_CONTENT_URI = Uri.parse("content://" + CONTENT_AUTHORITY);
 
     // Possible paths supported by the content provider
