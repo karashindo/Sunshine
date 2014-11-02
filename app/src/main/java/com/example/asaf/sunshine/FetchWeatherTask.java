@@ -1,9 +1,15 @@
 package com.example.asaf.sunshine;
 
+import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.util.Log;
+
+import com.example.asaf.sunshine.data.WeatherContract;
+import com.example.asaf.sunshine.data.WeatherContract.WeatherEntry;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -17,6 +23,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Vector;
 
 /**
  * Created by ayaffe on 11/1/2014.
@@ -101,15 +108,27 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
         Log.v(LOG_TAG, cityName + ", with coord: " + cityLatitude + " " + cityLongitude);
 
         // Insert the location into the database.
-        // The function referenced here is not yet implemented, so we've commented it out for now.
-//        long locationID = addLocation(locationSetting, cityName, cityLatitude, cityLongitude);
+        long locationID = addLocation(locationSetting, cityName, cityLatitude, cityLongitude);
+
+        // Get and insert the new weather information into the database
+        Vector<ContentValues> cVVector = new Vector<ContentValues>(weatherArray.length());
 
         String[] resultStrs = new String[numDays];
+
         for(int i = 0; i < weatherArray.length(); i++) {
-            // For now, using the format "Day, description, hi/low"
-            String day;
+            // These are the values that will be collected.
+
+            long dateTime;
+            double pressure;
+            int humidity;
+            double windSpeed;
+            double windDirection;
+
+            double high;
+            double low;
+
             String description;
-            String highAndLow;
+            int weatherId;
 
             // Get the JSON object representing the day
             JSONObject dayForecast = weatherArray.getJSONObject(i);
@@ -117,22 +136,59 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
             // The date/time is returned as a long.  We need to convert that
             // into something human-readable, since most people won't read "1400356800" as
             // "this saturday".
-            long dateTime = dayForecast.getLong(OWM_DATETIME);
-            day = getReadableDateString(dateTime);
+            dateTime = dayForecast.getLong(OWM_DATETIME);
 
-            // description is in a child array called "weather", which is 1 element long.
-            JSONObject weatherObject = dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
+            pressure = dayForecast.getDouble(OWM_PRESSURE);
+            humidity = dayForecast.getInt(OWM_HUMIDITY);
+            windSpeed = dayForecast.getDouble(OWM_WINDSPEED);
+            windDirection = dayForecast.getDouble(OWM_WIND_DIRECTION);
+
+            // Description is in a child array called "weather", which is 1 element long.
+            // That element also contains a weather code.
+            JSONObject weatherObject =
+                    dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
             description = weatherObject.getString(OWM_DESCRIPTION);
+            weatherId = weatherObject.getInt(OWM_WEATHER_ID);
 
             // Temperatures are in a child object called "temp".  Try not to name variables
             // "temp" when working with temperature.  It confuses everybody.
             JSONObject temperatureObject = dayForecast.getJSONObject(OWM_TEMPERATURE);
-            double high = temperatureObject.getDouble(OWM_MAX);
-            double low = temperatureObject.getDouble(OWM_MIN);
+            high = temperatureObject.getDouble(OWM_MAX);
+            low = temperatureObject.getDouble(OWM_MIN);
 
-            highAndLow = formatHighLows(high, low);
+            ContentValues weatherValues = new ContentValues();
+
+            weatherValues.put(WeatherEntry.COLUMN_LOC_KEY, locationID);
+            weatherValues.put(WeatherEntry.COLUMN_DATETEXT,
+                    WeatherContract.getDbDateString(new Date(dateTime * 1000L)));
+            weatherValues.put(WeatherEntry.COLUMN_HUMIDITY, humidity);
+            weatherValues.put(WeatherEntry.COLUMN_PRESSURE, pressure);
+            weatherValues.put(WeatherEntry.COLUMN_WIND_SPEED, windSpeed);
+            weatherValues.put(WeatherEntry.COLUMN_DEGREES, windDirection);
+            weatherValues.put(WeatherEntry.COLUMN_MAX_TEMP, high);
+            weatherValues.put(WeatherEntry.COLUMN_MIN_TEMP, low);
+            weatherValues.put(WeatherEntry.COLUMN_SHORT_DESC, description);
+            weatherValues.put(WeatherEntry.COLUMN_WEATHER_ID, weatherId);
+
+            cVVector.add(weatherValues);
+
+            String highAndLow = formatHighLows(high, low);
+            String day = getReadableDateString(dateTime);
             resultStrs[i] = day + " - " + description + " - " + highAndLow;
         }
+
+        if (cVVector.size() >0 ) {
+            // Delete existing weather forecast for the location
+            mContext.getContentResolver().delete(WeatherEntry.CONTENT_URI,
+                    WeatherEntry.COLUMN_LOC_KEY + "=?",
+                    new String[]{Long.toString(locationID)});
+
+            // Bulk insert the new forecast
+            ContentValues[] cvArray = new ContentValues[cVVector.size()];
+            cVVector.toArray(cvArray);
+            mContext.getContentResolver().bulkInsert(WeatherEntry.CONTENT_URI, cvArray);
+        }
+
         return resultStrs;
     }
 
@@ -237,5 +293,34 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
     protected void onPostExecute(Void result) {
     }
 
+    private long addLocation(String locationSetting, String cityName, double lat, double lon) {
+
+        // Check if the location already exists
+        Cursor cursor = mContext.getContentResolver().query(
+                WeatherContract.LocationEntry.CONTENT_URI,
+                new String[] {WeatherContract.LocationEntry._ID},
+                WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING + "= ?",
+                new String[] {locationSetting},
+                null);
+
+        if (cursor.moveToFirst()) {
+            int locationIdIndex = cursor.getColumnIndex(WeatherContract.LocationEntry._ID);
+            return cursor.getLong(locationIdIndex);
+        } else {
+            ContentValues testValues = new ContentValues();
+            testValues.put(WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING, locationSetting);
+            testValues.put(WeatherContract.LocationEntry.COLUMN_CITY_NAME, cityName);
+            testValues.put(WeatherContract.LocationEntry.COLUMN_COORD_LAT, lat);
+            testValues.put(WeatherContract.LocationEntry.COLUMN_COORD_LONG, lon);
+
+            Uri locationInsertUri = mContext.getContentResolver().insert(
+                    WeatherContract.LocationEntry.CONTENT_URI, testValues);
+            if (locationInsertUri != null) {
+                return ContentUris.parseId(locationInsertUri);
+            }
+            Log.e(LOG_TAG, "Error inserting location into DB");
+            return 0; // ERROR!
+        }
+    }
 
 }
