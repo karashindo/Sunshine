@@ -36,27 +36,6 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
     public FetchWeatherTask(Context context) {
         mContext = context;
     }
-    /* The date/time conversion code is going to be moved outside the asynctask later,
-     * so for convenience we're breaking it out into its own method now.
-     */
-    private String getReadableDateString(long time){
-        // Because the API returns a unix timestamp (measured in seconds),
-        // it must be converted to milliseconds in order to be converted to valid date.
-        Date date = new Date(time * 1000);
-        SimpleDateFormat format = new SimpleDateFormat("E, MMM d");
-        return format.format(date);
-    }
-
-    /**
-     * Prepare the weather high/lows for presentation.
-     */
-    private String formatHighLows(double high, double low) {
-        // For presentation, assume the user doesn't care about tenths of a degree.
-        long roundedHigh = Math.round(high);
-        long roundedLow = Math.round(low);
-
-        return roundedHigh + "/" + roundedLow;
-    }
 
     /**
      * Take the String representing the complete forecast in JSON Format and
@@ -65,7 +44,7 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
      * Fortunately parsing is easy:  constructor takes the JSON string and converts it
      * into an Object hierarchy for us.
      */
-    private String[] getWeatherDataFromJson(String forecastJsonStr, int numDays,
+    private void getWeatherDataFromJson(String forecastJsonStr, int numDays,
                                             String locationSetting)
             throws JSONException {
 
@@ -105,15 +84,11 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
         double cityLatitude = coordJSON.getLong(OWM_COORD_LAT);
         double cityLongitude = coordJSON.getLong(OWM_COORD_LONG);
 
-        Log.v(LOG_TAG, cityName + ", with coord: " + cityLatitude + " " + cityLongitude);
-
         // Insert the location into the database.
         long locationID = addLocation(locationSetting, cityName, cityLatitude, cityLongitude);
 
         // Get and insert the new weather information into the database
         Vector<ContentValues> cVVector = new Vector<ContentValues>(weatherArray.length());
-
-        String[] resultStrs = new String[numDays];
 
         for(int i = 0; i < weatherArray.length(); i++) {
             // These are the values that will be collected.
@@ -171,10 +146,6 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
             weatherValues.put(WeatherEntry.COLUMN_WEATHER_ID, weatherId);
 
             cVVector.add(weatherValues);
-
-            String highAndLow = formatHighLows(high, low);
-            String day = getReadableDateString(dateTime);
-            resultStrs[i] = day + " - " + description + " - " + highAndLow;
         }
 
         if (cVVector.size() >0 ) {
@@ -189,7 +160,6 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
             mContext.getContentResolver().bulkInsert(WeatherEntry.CONTENT_URI, cvArray);
         }
 
-        return resultStrs;
     }
 
     private double celsiusToImperial(double celsius) {
@@ -262,7 +232,6 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
             }
             forecastJsonStr = buffer.toString();
         } catch (IOException e) {
-            Log.e(LOG_TAG, "Error ", e);
             // If the code didn't successfully get the weather data, there's no point in attempting
             // to parse it.
             forecastJsonStr = null;
@@ -280,17 +249,12 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
         }
         try {
             if (forecastJsonStr != null) {
-                String[] weatherStrs =  getWeatherDataFromJson(forecastJsonStr, numDays,
-                        locationQuery);
+                getWeatherDataFromJson(forecastJsonStr, numDays, locationQuery);
             }
         } catch (JSONException e) {
             Log.e(LOG_TAG, "JSON parse error: ", e);
         }
         return null;
-    }
-
-    @Override
-    protected void onPostExecute(Void result) {
     }
 
     private long addLocation(String locationSetting, String cityName, double lat, double lon) {
