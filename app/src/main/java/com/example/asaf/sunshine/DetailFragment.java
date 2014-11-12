@@ -17,6 +17,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.asaf.sunshine.data.WeatherContract;
@@ -25,6 +26,16 @@ import com.example.asaf.sunshine.data.WeatherContract;
  * Created by ayaffe on 11/10/2014.
  */
 public class DetailFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
+
+    private ImageView mIconView;
+    private TextView mDateView;
+    private TextView mFriendlyDateView;
+    private TextView mDescriptionView;
+    private TextView mHighTempView;
+    private TextView mLowTempView;
+    private TextView mHumidityView;
+    private TextView mPressureView;
+    private TextView mWindView;
 
     private static final String LOCATION_KEY = "location";
 
@@ -49,7 +60,9 @@ public class DetailFragment extends Fragment implements LoaderManager.LoaderCall
             WeatherContract.WeatherEntry.COLUMN_HUMIDITY,
             WeatherContract.WeatherEntry.COLUMN_WIND_SPEED,
             WeatherContract.WeatherEntry.COLUMN_DEGREES,
-            WeatherContract.WeatherEntry.COLUMN_PRESSURE
+            WeatherContract.WeatherEntry.COLUMN_PRESSURE,
+            WeatherContract.WeatherEntry.COLUMN_WEATHER_ID,
+            WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING
     };
 
     public DetailFragment() {
@@ -74,7 +87,17 @@ public class DetailFragment extends Fragment implements LoaderManager.LoaderCall
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_detail, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_detail, container, false);
+        mIconView = (ImageView)rootView.findViewById(R.id.detail_icon);
+        mDateView = (TextView)rootView.findViewById(R.id.detail_date_textview);
+        mFriendlyDateView = (TextView)rootView.findViewById(R.id.detail_day_textview);
+        mDescriptionView = (TextView)rootView.findViewById(R.id.detail_forecast_textview);
+        mHighTempView = (TextView)rootView.findViewById(R.id.detail_high_textview);
+        mLowTempView = (TextView)rootView.findViewById(R.id.detail_low_textview);
+        mHumidityView = (TextView)rootView.findViewById(R.id.detail_humidity_textview);
+        mPressureView = (TextView)rootView.findViewById(R.id.detail_pressure_textview);
+        mWindView = (TextView)rootView.findViewById(R.id.detail_wind_textview);
+        return rootView;
     }
 
     @Override
@@ -146,41 +169,44 @@ public class DetailFragment extends Fragment implements LoaderManager.LoaderCall
         Log.v(LOG_TAG, "In onLoadFinished");
         if (!data.moveToFirst()) { return; }
 
-        String dateString = Utility.formatDate(
-                data.getString(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_DATETEXT)));
-        ((TextView) getView().findViewById(R.id.detail_date_textview))
-                .setText(dateString);
+        int weatherId = data.getInt(data.getColumnIndex(
+                WeatherContract.WeatherEntry.COLUMN_WEATHER_ID));
+        mIconView.setImageResource(Utility.getArtResourceForWeatherCondition(weatherId));
+        String date = data.getString(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_DATETEXT));
+        String friendlyDateText = Utility.getDayName(getActivity(), date);
+        String dateText = Utility.getFormattedMonthDay(getActivity(), date);
+        mFriendlyDateView.setText(friendlyDateText);
+        mDateView.setText(dateText);
 
         String weatherDescription =
                 data.getString(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_SHORT_DESC));
-        ((TextView) getView().findViewById(R.id.detail_forecast_textview))
-                .setText(weatherDescription);
+        mDescriptionView.setText(weatherDescription);
 
         boolean isMetric = Utility.isMetric(getActivity());
 
         String high = Utility.formatTemperature(getActivity(),
                 data.getDouble(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP)), isMetric);
-        ((TextView) getView().findViewById(R.id.detail_high_textview)).setText(high);
+        mHighTempView.setText(high);
 
         String low = Utility.formatTemperature(getActivity(),
                 data.getDouble(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_MIN_TEMP)), isMetric);
-        ((TextView) getView().findViewById(R.id.detail_low_textview)).setText(low);
+        mLowTempView.setText(low);
 
         String humidity = getString(R.string.format_humidity,
                 data.getDouble(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_HUMIDITY)));
-        ((TextView) getView().findViewById(R.id.detail_humidity_textview)).setText(humidity);
+        mHumidityView.setText(humidity);
 
         String wind = Utility.getFormattedWind(getActivity(),
                 data.getFloat(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_WIND_SPEED)),
                 data.getFloat(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_DEGREES)));
-        ((TextView) getView().findViewById(R.id.detail_wind_textview)).setText(wind);
+        mWindView.setText(wind);
 
         String pressure = getString(R.string.format_pressure,
                 data.getDouble(data.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_PRESSURE)));
-        ((TextView) getView().findViewById(R.id.detail_pressure_textview)).setText(pressure);
+        mPressureView.setText(pressure);
 
         // We still need this for the share intent
-        mForecast = String.format("%s - %s - %s/%s", dateString, weatherDescription, high, low);
+        mForecast = String.format("%s - %s - %s/%s", date, weatherDescription, high, low);
 
         Log.v(LOG_TAG, "Forecast String: " + mForecast);
 
