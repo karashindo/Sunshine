@@ -3,7 +3,6 @@ package com.example.asaf.sunshine.data;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.location.Location;
 
 import com.example.asaf.sunshine.data.WeatherContract.LocationEntry;
 import com.example.asaf.sunshine.data.WeatherContract.WeatherEntry;

@@ -6,9 +6,9 @@ import android.database.sqlite.SQLiteDatabase;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
-import com.example.asaf.sunshine.data.WeatherDbHelper;
 import com.example.asaf.sunshine.data.WeatherContract.LocationEntry;
 import com.example.asaf.sunshine.data.WeatherContract.WeatherEntry;
+import com.example.asaf.sunshine.data.WeatherDbHelper;
 
 import java.util.Map;
 import java.util.Set;

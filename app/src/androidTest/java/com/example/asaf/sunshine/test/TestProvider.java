@@ -4,16 +4,13 @@ import android.annotation.TargetApi;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Build;
 import android.test.AndroidTestCase;
 import android.util.Log;
 
-import com.example.asaf.sunshine.data.WeatherContract;
 import com.example.asaf.sunshine.data.WeatherContract.LocationEntry;
 import com.example.asaf.sunshine.data.WeatherContract.WeatherEntry;
-import com.example.asaf.sunshine.data.WeatherDbHelper;
 
 import java.util.Map;
 import java.util.Set;

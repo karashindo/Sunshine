@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2014 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.example.asaf.sunshine;
 
 import android.content.ContentUris;
@@ -9,6 +24,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 
 import com.example.asaf.sunshine.data.WeatherContract;
+import com.example.asaf.sunshine.data.WeatherContract.LocationEntry;
 import com.example.asaf.sunshine.data.WeatherContract.WeatherEntry;
 
 import org.json.JSONArray;
@@ -21,13 +37,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Vector;
 
-/**
- * Created by ayaffe on 11/1/2014.
- */
 public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
 
     private final String LOG_TAG = FetchWeatherTask.class.getSimpleName();
@@ -35,6 +47,42 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
 
     public FetchWeatherTask(Context context) {
         mContext = context;
+    }
+
+    /**
+     * Helper method to handle insertion of a new location in the weather database.
+     *
+     * @param locationSetting The location string used to request updates from the server.
+     * @param cityName A human-readable city name, e.g "Mountain View"
+     * @param lat the latitude of the city
+     * @param lon the longitude of the city
+     * @return the row ID of the added location.
+     */
+    private long addLocation(String locationSetting, String cityName, double lat, double lon) {
+
+        // First, check if the location with this city name exists in the db
+        Cursor cursor = mContext.getContentResolver().query(
+                LocationEntry.CONTENT_URI,
+                new String[]{LocationEntry._ID},
+                LocationEntry.COLUMN_LOCATION_SETTING + " = ?",
+                new String[]{locationSetting},
+                null);
+
+        if (cursor.moveToFirst()) {
+            int locationIdIndex = cursor.getColumnIndex(LocationEntry._ID);
+            return cursor.getLong(locationIdIndex);
+        } else {
+            ContentValues locationValues = new ContentValues();
+            locationValues.put(LocationEntry.COLUMN_LOCATION_SETTING, locationSetting);
+            locationValues.put(LocationEntry.COLUMN_CITY_NAME, cityName);
+            locationValues.put(LocationEntry.COLUMN_COORD_LAT, lat);
+            locationValues.put(LocationEntry.COLUMN_COORD_LONG, lon);
+
+            Uri locationInsertUri = mContext.getContentResolver()
+                    .insert(LocationEntry.CONTENT_URI, locationValues);
+
+            return ContentUris.parseId(locationInsertUri);
+        }
     }
 
     /**
@@ -83,6 +131,8 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
         JSONObject coordJSON = cityJson.getJSONObject(OWM_COORD);
         double cityLatitude = coordJSON.getLong(OWM_COORD_LAT);
         double cityLongitude = coordJSON.getLong(OWM_COORD_LONG);
+
+        Log.v(LOG_TAG, cityName + ", with coord: " + cityLatitude + " " + cityLongitude);
 
         // Insert the location into the database.
         long locationID = addLocation(locationSetting, cityName, cityLatitude, cityLongitude);
@@ -147,33 +197,20 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
 
             cVVector.add(weatherValues);
         }
-
-        if (cVVector.size() >0 ) {
-            // Delete existing weather forecast for the location
-            mContext.getContentResolver().delete(WeatherEntry.CONTENT_URI,
-                    WeatherEntry.COLUMN_LOC_KEY + "=?",
-                    new String[]{Long.toString(locationID)});
-
-            // Bulk insert the new forecast
+        if (cVVector.size() > 0) {
             ContentValues[] cvArray = new ContentValues[cVVector.size()];
             cVVector.toArray(cvArray);
             mContext.getContentResolver().bulkInsert(WeatherEntry.CONTENT_URI, cvArray);
         }
-
-    }
-
-    private double celsiusToImperial(double celsius) {
-        return ((9.0 / 5.0) * celsius) + 32;
     }
 
     @Override
     protected Void doInBackground(String... params) {
 
-        // Make sure we have something to query, otherwise do nothing
+        // If there's no zip code, there's nothing to look up.  Verify size of params.
         if (params.length == 0) {
             return null;
         }
-
         String locationQuery = params[0];
 
         // These two need to be declared outside the try/catch
@@ -183,25 +220,29 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
 
         // Will contain the raw JSON response as a string.
         String forecastJsonStr = null;
+
         String format = "json";
         String units = "metric";
         int numDays = 14;
+
         try {
             // Construct the URL for the OpenWeatherMap query
-            // Possible parameters are available at OWM's forecast API page, at
+            // Possible parameters are avaiable at OWM's forecast API page, at
             // http://openweathermap.org/API#forecast
             final String FORECAST_BASE_URL =
                     "http://api.openweathermap.org/data/2.5/forecast/daily?";
             final String QUERY_PARAM = "q";
-            final String MODE_PARAM = "mode";
+            final String FORMAT_PARAM = "mode";
             final String UNITS_PARAM = "units";
             final String DAYS_PARAM = "cnt";
+
             Uri builtUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
-                    .appendQueryParameter("q", params[0])
-                    .appendQueryParameter("mode", format)
-                    .appendQueryParameter("units", units)
-                    .appendQueryParameter("cnt", Integer.toString(numDays))
+                    .appendQueryParameter(QUERY_PARAM, params[0])
+                    .appendQueryParameter(FORMAT_PARAM, format)
+                    .appendQueryParameter(UNITS_PARAM, units)
+                    .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
                     .build();
+
             URL url = new URL(builtUri.toString());
 
             // Create the request to OpenWeatherMap, and open the connection
@@ -214,7 +255,7 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
             StringBuffer buffer = new StringBuffer();
             if (inputStream == null) {
                 // Nothing to do.
-                forecastJsonStr = null;
+                return null;
             }
             reader = new BufferedReader(new InputStreamReader(inputStream));
 
@@ -228,14 +269,15 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
 
             if (buffer.length() == 0) {
                 // Stream was empty.  No point in parsing.
-                forecastJsonStr = null;
+                return null;
             }
             forecastJsonStr = buffer.toString();
         } catch (IOException e) {
-            // If the code didn't successfully get the weather data, there's no point in attempting
+            Log.e(LOG_TAG, "Error ", e);
+            // If the code didn't successfully get the weather data, there's no point in attemping
             // to parse it.
-            forecastJsonStr = null;
-        } finally{
+            return null;
+        } finally {
             if (urlConnection != null) {
                 urlConnection.disconnect();
             }
@@ -247,44 +289,14 @@ public class FetchWeatherTask extends AsyncTask<String, Void, Void> {
                 }
             }
         }
+
         try {
-            if (forecastJsonStr != null) {
-                getWeatherDataFromJson(forecastJsonStr, numDays, locationQuery);
-            }
+            getWeatherDataFromJson(forecastJsonStr, numDays, locationQuery);
         } catch (JSONException e) {
-            Log.e(LOG_TAG, "JSON parse error: ", e);
+            Log.e(LOG_TAG, e.getMessage(), e);
+            e.printStackTrace();
         }
+        // This will only happen if there was an error getting or parsing the forecast.
         return null;
     }
-
-    private long addLocation(String locationSetting, String cityName, double lat, double lon) {
-
-        // Check if the location already exists
-        Cursor cursor = mContext.getContentResolver().query(
-                WeatherContract.LocationEntry.CONTENT_URI,
-                new String[] {WeatherContract.LocationEntry._ID},
-                WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING + "= ?",
-                new String[] {locationSetting},
-                null);
-
-        if (cursor.moveToFirst()) {
-            int locationIdIndex = cursor.getColumnIndex(WeatherContract.LocationEntry._ID);
-            return cursor.getLong(locationIdIndex);
-        } else {
-            ContentValues testValues = new ContentValues();
-            testValues.put(WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING, locationSetting);
-            testValues.put(WeatherContract.LocationEntry.COLUMN_CITY_NAME, cityName);
-            testValues.put(WeatherContract.LocationEntry.COLUMN_COORD_LAT, lat);
-            testValues.put(WeatherContract.LocationEntry.COLUMN_COORD_LONG, lon);
-
-            Uri locationInsertUri = mContext.getContentResolver().insert(
-                    WeatherContract.LocationEntry.CONTENT_URI, testValues);
-            if (locationInsertUri != null) {
-                return ContentUris.parseId(locationInsertUri);
-            }
-            Log.e(LOG_TAG, "Error inserting location into DB");
-            return 0; // ERROR!
-        }
-    }
-
 }
