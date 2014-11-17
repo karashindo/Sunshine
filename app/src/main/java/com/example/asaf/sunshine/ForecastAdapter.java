@@ -30,9 +30,9 @@ public class ForecastAdapter extends CursorAdapter {
 
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
-        // Choose the layout type
-        int viewType = getItemViewType(cursor.getPosition());
         int layoutId = -1;
+        // On phones, choose the layout type for the item, on tablet always use a simple list entry
+        int viewType = getItemViewType(cursor.getPosition());
         // Determine layoutId from viewType
         layoutId = (viewType == VIEW_TYPE_TODAY) ? R.layout.list_item_forecast_today :
                 R.layout.list_item_forecast;

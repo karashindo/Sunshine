@@ -13,14 +13,27 @@ import android.widget.Toast;
 
 public class MyActivity extends ActionBarActivity {
 
+    private boolean mTwoPane;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my);
-        if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .add(R.id.container, new ForecastFragment())
-                    .commit();
+        if (findViewById(R.id.weather_detail_container) != null) {
+            // The weather detail view exists, so it means our layout is a tablet UI (sw600dp)
+            mTwoPane = true;
+
+            // In two-pane mode, we need to create the detail fragment but only if there is no
+            // previously saved state. If there is a saved state, we let the system framework
+            // reconstruct the fragment by not doing anything.
+            if (savedInstanceState == null) {
+                getSupportFragmentManager().beginTransaction().
+                        replace(R.id.weather_detail_container, new DetailFragment())
+                        .commit();
+            }
+        } else {
+            // Single pane mode
+            mTwoPane = false;
         }
     }
 
